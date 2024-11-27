@@ -1,0 +1,545 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: John Doe <john.doe@somewhere.on.planet>
+Date: Wed, 27 Nov 2024 21:24:57 +0000
+Subject: Patching kernel rockchip64 files
+ arch/arm/boot/dts/rockchip/rk3288-miqi.dts
+ arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi
+ arch/arm64/boot/dts/rockchip/rk3328-a1.dts
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+ arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+ arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c
+ sound/soc/codecs/hdmi-codec.c
+
+Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+---
+ arch/arm/boot/dts/rockchip/rk3288-miqi.dts          |  22 ++
+ arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi       |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3328-a1.dts          |  36 +++
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts      |   7 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts      |   4 +
+ arch/arm64/boot/dts/rockchip/rk3399-base.dtsi       |   4 +-
+ arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi     |   6 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c       |  18 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c |   8 +-
+ sound/soc/codecs/hdmi-codec.c                       | 113 +++++-----
+ 10 files changed, 147 insertions(+), 73 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk3288-miqi.dts b/arch/arm/boot/dts/rockchip/rk3288-miqi.dts
+index db1eb648e..c7a4c20f0 100644
+--- a/arch/arm/boot/dts/rockchip/rk3288-miqi.dts
++++ b/arch/arm/boot/dts/rockchip/rk3288-miqi.dts
+@@ -76,10 +76,25 @@ vcc_sys: vsys-regulator {
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,name = "HDMI";
++		simple-audio-card,mclk-fs = <512>;
++
++		simple-audio-card,codec {
++			sound-dai = <&hdmi>;
++		};
++
++		simple-audio-card,cpu {
++			sound-dai = <&i2s>;
++		};
++	};
+ };
+ 
+ &cpu0 {
+ 	cpu-supply = <&vdd_cpu>;
+ };
+@@ -128,10 +143,12 @@ &gpu {
+ 	status = "okay";
+ };
+ 
+ &hdmi {
+ 	ddc-i2c-bus = <&i2c5>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_cec_c0>;
+ 	status = "okay";
+ };
+ 
+ &i2c0 {
+ 	clock-frequency = <400000>;
+@@ -281,10 +298,15 @@ &i2c4 {
+ 
+ &i2c5 {
+ 	status = "okay";
+ };
+ 
++&i2s {
++	#sound-dai-cells = <0>;
++	status = "okay";
++};
++
+ &io_domains {
+ 	status = "okay";
+ 
+ 	audio-supply = <&vcca_33>;
+ 	flash0-supply = <&vcc_flash>;
+diff --git a/arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi b/arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi
+index 09618bb7d..db9106a3d 100644
+--- a/arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk3288-tinker.dtsi
+@@ -71,11 +71,11 @@ sdio_pwrseq: sdio-pwrseq {
+ 	};
+ 
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,format = "i2s";
+-		simple-audio-card,name = "rockchip,tinker-codec";
++		simple-audio-card,name = "HDMI";
+ 		simple-audio-card,mclk-fs = <512>;
+ 
+ 		simple-audio-card,codec {
+ 			sound-dai = <&hdmi>;
+ 		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-a1.dts b/arch/arm64/boot/dts/rockchip/rk3328-a1.dts
+index 824183e51..93bc99626 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-a1.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-a1.dts
+@@ -56,10 +56,28 @@ vcc_sys: vcc-sys {
+ 	ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
+ 		linux,rc-map-name = "rc-beelink-gs1";
+ 	};
++
++	spdif_sound: spdif-sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "SPDIF";
++
++		simple-audio-card,cpu {
++			sound-dai = <&spdif>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&spdif_dit>;
++		};
++	};
++
++	spdif_dit: spdif-dit {
++		compatible = "linux,spdif-dit";
++		#sound-dai-cells = <0>;
++	};
+ };
+ 
+ &analog_sound {
+ 	simple-audio-card,name = "Analog A/V";
+ 	status = "okay";
+@@ -128,10 +146,18 @@ rtl8211f: ethernet-phy@0 {
+ 			reset-gpios = <&gpio2 RK_PC1 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+ 
++&gmac2phy {
++	clock_in_out = "output";
++	assigned-clock-rate = <50000000>;
++	assigned-clocks = <&cru SCLK_MAC2PHY>;
++	assigned-clock-parents = <&cru SCLK_MAC2PHY_SRC>;
++	status = "okay";
++};
++
+ &gpu {
+ 	mali-supply = <&vdd_logic>;
+ };
+ 
+ &hdmi {
+@@ -324,10 +350,15 @@ &sdmmc {
+ 	vmmc-supply = <&vcc_io>;
+ 	vqmmc-supply = <&vcc_io>;
+ 	status = "okay";
+ };
+ 
++&spdif {
++	pinctrl-0 = <&spdifm0_tx>;
++	status = "okay";
++};
++
+ &tsadc {
+ 	rockchip,hw-tshut-mode = <0>;
+ 	rockchip,hw-tshut-polarity = <0>;
+ 	status = "okay";
+ };
+@@ -357,10 +388,15 @@ &usb_host0_ehci {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&bt_dis &bt_wake_host &chip_en &host_wake_bt &wl_dis &wl_wake_host>;
+ 	status = "okay";
+ };
+ 
++&usbdrd3 {
++	dr_mode = "host";
++	status = "okay";
++};
++
+ &vop {
+ 	status = "okay";
+ };
+ 
+ &vop_mmu {
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+index 7966f8a3a..6f97a0bc2 100755
+--- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+@@ -114,10 +114,17 @@ vcc_phy: vcc-phy-regulator {
+ 		regulator-name = "vcc_phy";
+ 		regulator-always-on;
+ 		regulator-boot-on;
+ 	};
+ 
++	ir-receiver {
++		compatible = "gpio-ir-receiver";
++		gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
++		pinctrl-0 = <&ir_int>;
++		pinctrl-names = "default";
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+ 		power_led: led-0 {
+ 			label = "firefly:blue:power";
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+index 2e5a95139..6a8457f76 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -156,10 +156,14 @@ &gmac2io {
+ 	tx_delay = <0x24>;
+ 	rx_delay = <0x18>;
+ 	status = "okay";
+ };
+ 
++&gpu {
++	mali-supply = <&vdd_logic>;
++};
++
+ &hdmi {
+ 	avdd-0v9-supply = <&vdd_10>;
+ 	avdd-1v8-supply = <&vcc_18>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+index 7d2a01e64..6af5d7d9f 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+@@ -1605,11 +1605,11 @@ cru: clock-controller@ff760000 {
+ 		assigned-clock-rates =
+ 			 <594000000>,  <800000000>,
+ 			<1000000000>,
+ 			 <150000000>,   <75000000>,
+ 			  <37500000>,
+-			 <100000000>,  <100000000>,
++			 <300000000>,  <100000000>,
+ 			  <50000000>, <600000000>,
+ 			 <100000000>,   <50000000>,
+ 			 <400000000>, <400000000>,
+ 			 <200000000>,
+ 			 <200000000>,
+@@ -2021,11 +2021,11 @@ isp1_mmu: iommu@ff924000 {
+ 
+ 	hdmi_sound: hdmi-sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,format = "i2s";
+ 		simple-audio-card,mclk-fs = <256>;
+-		simple-audio-card,name = "hdmi-sound";
++		simple-audio-card,name = "HDMI";
+ 		status = "disabled";
+ 
+ 		simple-audio-card,cpu {
+ 			sound-dai = <&i2s2>;
+ 		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi
+index d95b1cde1..672869d35 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dtsi
+@@ -213,11 +213,11 @@ vdd_log: vdd-log {
+ 		compatible = "pwm-regulator";
+ 		pwms = <&pwm2 0 25000 1>;
+ 		regulator-name = "vdd_log";
+ 		regulator-always-on;
+ 		regulator-boot-on;
+-		regulator-min-microvolt = <450000>;
++		regulator-min-microvolt = <430000>;
+ 		regulator-max-microvolt = <1400000>;
+ 		pwm-supply = <&vcc3v3_sys>;
+ 	};
+ };
+ 
+@@ -534,11 +534,11 @@ fusb1: usb-typec@22 {
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&fusb1_int>;
+ 		vbus-supply = <&vcc_vbus_typec1>;
+-		status = "okay";
++		status = "disabled";
+ 	};
+ };
+ 
+ &i2c7 {
+ 	i2c-scl-rising-time-ns = <600>;
+@@ -551,11 +551,11 @@ fusb0: usb-typec@22 {
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&fusb0_int>;
+ 		vbus-supply = <&vcc_vbus_typec0>;
+-		status = "okay";
++		status = "disabled";
+ 	};
+ 
+ 	mp8859: regulator@66 {
+ 		compatible = "mps,mp8859";
+ 		reg = <0x66>;
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+index 673661160..2e01c6044 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+@@ -2,10 +2,11 @@
+ /*
+  * Designware HDMI CEC driver
+  *
+  * Copyright (C) 2015-2017 Russell King.
+  */
++#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+@@ -131,12 +132,19 @@ static irqreturn_t dw_hdmi_cec_hardirq(int irq, void *data)
+ 	if (stat == 0)
+ 		return IRQ_NONE;
+ 
+ 	dw_hdmi_write(cec, stat, HDMI_IH_CEC_STAT0);
+ 
+-	if (stat & CEC_STAT_ERROR_INIT) {
+-		cec->tx_status = CEC_TX_STATUS_ERROR;
++	/* Status with both done and error_initiator bits have been seen
++	 * on Rockchip RK3328 devices, transmit attempt seems to have failed
++	 * when this happens, report as low drive and block cec-framework
++	 * 100ms before core retransmits the failed message, this seems to
++	 * mitigate the issue with failed transmit attempts.
++	 */
++	if ((stat & (CEC_STAT_DONE|CEC_STAT_ERROR_INIT)) == (CEC_STAT_DONE|CEC_STAT_ERROR_INIT)) {
++		pr_debug("dw_hdmi_cec_hardirq: stat=%02x LOW_DRIVE\n", stat);
++		cec->tx_status = CEC_TX_STATUS_LOW_DRIVE;
+ 		cec->tx_done = true;
+ 		ret = IRQ_WAKE_THREAD;
+ 	} else if (stat & CEC_STAT_DONE) {
+ 		cec->tx_status = CEC_TX_STATUS_OK;
+ 		cec->tx_done = true;
+@@ -147,10 +155,14 @@ static irqreturn_t dw_hdmi_cec_hardirq(int irq, void *data)
+ 		ret = IRQ_WAKE_THREAD;
+ 	} else if (stat & CEC_STAT_ARBLOST) {
+ 		cec->tx_status = CEC_TX_STATUS_ARB_LOST;
+ 		cec->tx_done = true;
+ 		ret = IRQ_WAKE_THREAD;
++	} else if (stat & CEC_STAT_ERROR_INIT) {
++		cec->tx_status = CEC_TX_STATUS_ERROR;
++		cec->tx_done = true;
++		ret = IRQ_WAKE_THREAD;
+ 	}
+ 
+ 	if (stat & CEC_STAT_EOM) {
+ 		unsigned int len, i;
+ 
+@@ -179,10 +191,12 @@ static irqreturn_t dw_hdmi_cec_thread(int irq, void *data)
+ 	struct cec_adapter *adap = data;
+ 	struct dw_hdmi_cec *cec = cec_get_drvdata(adap);
+ 
+ 	if (cec->tx_done) {
+ 		cec->tx_done = false;
++		if (cec->tx_status == CEC_TX_STATUS_LOW_DRIVE)
++			msleep(100);
+ 		cec_transmit_attempt_done(adap, cec->tx_status);
+ 	}
+ 	if (cec->rx_done) {
+ 		cec->rx_done = false;
+ 		smp_rmb();
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c
+index 26c187d20..5343662f2 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c
+@@ -32,13 +32,13 @@ static inline u8 hdmi_read(struct dw_hdmi_i2s_audio_data *audio, int offset)
+ 	struct dw_hdmi *hdmi = audio->hdmi;
+ 
+ 	return audio->read(hdmi, offset);
+ }
+ 
+-static int dw_hdmi_i2s_hw_params(struct device *dev, void *data,
+-				 struct hdmi_codec_daifmt *fmt,
+-				 struct hdmi_codec_params *hparms)
++static int dw_hdmi_i2s_prepare(struct device *dev, void *data,
++			       struct hdmi_codec_daifmt *fmt,
++			       struct hdmi_codec_params *hparms)
+ {
+ 	struct dw_hdmi_i2s_audio_data *audio = data;
+ 	struct dw_hdmi *hdmi = audio->hdmi;
+ 	u8 conf0 = 0;
+ 	u8 conf1 = 0;
+@@ -176,11 +176,11 @@ static int dw_hdmi_i2s_hook_plugged_cb(struct device *dev, void *data,
+ 
+ 	return dw_hdmi_set_plugged_cb(hdmi, fn, codec_dev);
+ }
+ 
+ static const struct hdmi_codec_ops dw_hdmi_i2s_ops = {
+-	.hw_params	= dw_hdmi_i2s_hw_params,
++	.prepare	= dw_hdmi_i2s_prepare,
+ 	.audio_startup  = dw_hdmi_i2s_audio_startup,
+ 	.audio_shutdown	= dw_hdmi_i2s_audio_shutdown,
+ 	.get_eld	= dw_hdmi_i2s_get_eld,
+ 	.get_dai_id	= dw_hdmi_i2s_get_dai_id,
+ 	.hook_plugged_cb = dw_hdmi_i2s_hook_plugged_cb,
+diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
+index 74caae52e..8cd0056d3 100644
+--- a/sound/soc/codecs/hdmi-codec.c
++++ b/sound/soc/codecs/hdmi-codec.c
+@@ -189,82 +189,73 @@ static const struct snd_pcm_chmap_elem hdmi_codec_8ch_chmaps[] = {
+  * The preceding ones have better chances to be selected by
+  * hdmi_codec_get_ch_alloc_table_idx().
+  */
+ static const struct hdmi_codec_cea_spk_alloc hdmi_codec_channel_alloc[] = {
+ 	{ .ca_id = 0x00, .n_ch = 2,
+-	  .mask = FL | FR},
+-	/* 2.1 */
+-	{ .ca_id = 0x01, .n_ch = 4,
+-	  .mask = FL | FR | LFE},
+-	/* Dolby Surround */
++	  .mask = FL | FR },
++	{ .ca_id = 0x03, .n_ch = 4,
++	  .mask = FL | FR | LFE | FC },
+ 	{ .ca_id = 0x02, .n_ch = 4,
+ 	  .mask = FL | FR | FC },
+-	/* surround51 */
++	{ .ca_id = 0x01, .n_ch = 4,
++	  .mask = FL | FR | LFE },
+ 	{ .ca_id = 0x0b, .n_ch = 6,
+-	  .mask = FL | FR | LFE | FC | RL | RR},
+-	/* surround40 */
+-	{ .ca_id = 0x08, .n_ch = 6,
+-	  .mask = FL | FR | RL | RR },
+-	/* surround41 */
+-	{ .ca_id = 0x09, .n_ch = 6,
+-	  .mask = FL | FR | LFE | RL | RR },
+-	/* surround50 */
++	  .mask = FL | FR | LFE | FC | RL | RR },
+ 	{ .ca_id = 0x0a, .n_ch = 6,
+ 	  .mask = FL | FR | FC | RL | RR },
+-	/* 6.1 */
+-	{ .ca_id = 0x0f, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FC | RL | RR | RC },
+-	/* surround71 */
++	{ .ca_id = 0x09, .n_ch = 6,
++	  .mask = FL | FR | LFE | RL | RR },
++	{ .ca_id = 0x08, .n_ch = 6,
++	  .mask = FL | FR | RL | RR },
++	{ .ca_id = 0x07, .n_ch = 6,
++	  .mask = FL | FR | LFE | FC | RC },
++	{ .ca_id = 0x06, .n_ch = 6,
++	  .mask = FL | FR | FC | RC },
++	{ .ca_id = 0x05, .n_ch = 6,
++	  .mask = FL | FR | LFE | RC },
++	{ .ca_id = 0x04, .n_ch = 6,
++	  .mask = FL | FR | RC },
+ 	{ .ca_id = 0x13, .n_ch = 8,
+ 	  .mask = FL | FR | LFE | FC | RL | RR | RLC | RRC },
+-	/* others */
+-	{ .ca_id = 0x03, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FC },
+-	{ .ca_id = 0x04, .n_ch = 8,
+-	  .mask = FL | FR | RC},
+-	{ .ca_id = 0x05, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RC },
+-	{ .ca_id = 0x06, .n_ch = 8,
+-	  .mask = FL | FR | FC | RC },
+-	{ .ca_id = 0x07, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FC | RC },
+-	{ .ca_id = 0x0c, .n_ch = 8,
+-	  .mask = FL | FR | RC | RL | RR },
+-	{ .ca_id = 0x0d, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RL | RR | RC },
+-	{ .ca_id = 0x0e, .n_ch = 8,
+-	  .mask = FL | FR | FC | RL | RR | RC },
+-	{ .ca_id = 0x10, .n_ch = 8,
+-	  .mask = FL | FR | RL | RR | RLC | RRC },
+-	{ .ca_id = 0x11, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RL | RR | RLC | RRC },
++	{ .ca_id = 0x1f, .n_ch = 8,
++	  .mask = FL | FR | LFE | FC | RL | RR | FLC | FRC },
+ 	{ .ca_id = 0x12, .n_ch = 8,
+ 	  .mask = FL | FR | FC | RL | RR | RLC | RRC },
+-	{ .ca_id = 0x14, .n_ch = 8,
+-	  .mask = FL | FR | FLC | FRC },
+-	{ .ca_id = 0x15, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FLC | FRC },
+-	{ .ca_id = 0x16, .n_ch = 8,
+-	  .mask = FL | FR | FC | FLC | FRC },
+-	{ .ca_id = 0x17, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FC | FLC | FRC },
+-	{ .ca_id = 0x18, .n_ch = 8,
+-	  .mask = FL | FR | RC | FLC | FRC },
+-	{ .ca_id = 0x19, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RC | FLC | FRC },
+-	{ .ca_id = 0x1a, .n_ch = 8,
+-	  .mask = FL | FR | RC | FC | FLC | FRC },
+-	{ .ca_id = 0x1b, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RC | FC | FLC | FRC },
+-	{ .ca_id = 0x1c, .n_ch = 8,
+-	  .mask = FL | FR | RL | RR | FLC | FRC },
+-	{ .ca_id = 0x1d, .n_ch = 8,
+-	  .mask = FL | FR | LFE | RL | RR | FLC | FRC },
+ 	{ .ca_id = 0x1e, .n_ch = 8,
+ 	  .mask = FL | FR | FC | RL | RR | FLC | FRC },
+-	{ .ca_id = 0x1f, .n_ch = 8,
+-	  .mask = FL | FR | LFE | FC | RL | RR | FLC | FRC },
++	{ .ca_id = 0x11, .n_ch = 8,
++	  .mask = FL | FR | LFE | RL | RR | RLC | RRC },
++	{ .ca_id = 0x1d, .n_ch = 8,
++	  .mask = FL | FR | LFE | RL | RR | FLC | FRC },
++	{ .ca_id = 0x10, .n_ch = 8,
++	  .mask = FL | FR | RL | RR | RLC | RRC },
++	{ .ca_id = 0x1c, .n_ch = 8,
++	  .mask = FL | FR | RL | RR | FLC | FRC },
++	{ .ca_id = 0x0f, .n_ch = 8,
++	  .mask = FL | FR | LFE | FC | RL | RR | RC },
++	{ .ca_id = 0x1b, .n_ch = 8,
++	  .mask = FL | FR | LFE | RC | FC | FLC | FRC },
++	{ .ca_id = 0x0e, .n_ch = 8,
++	  .mask = FL | FR | FC | RL | RR | RC },
++	{ .ca_id = 0x1a, .n_ch = 8,
++	  .mask = FL | FR | RC | FC | FLC | FRC },
++	{ .ca_id = 0x0d, .n_ch = 8,
++	  .mask = FL | FR | LFE | RL | RR | RC },
++	{ .ca_id = 0x19, .n_ch = 8,
++	  .mask = FL | FR | LFE | RC | FLC | FRC },
++	{ .ca_id = 0x0c, .n_ch = 8,
++	  .mask = FL | FR | RC | RL | RR },
++	{ .ca_id = 0x18, .n_ch = 8,
++	  .mask = FL | FR | RC | FLC | FRC },
++	{ .ca_id = 0x17, .n_ch = 8,
++	  .mask = FL | FR | LFE | FC | FLC | FRC },
++	{ .ca_id = 0x16, .n_ch = 8,
++	  .mask = FL | FR | FC | FLC | FRC },
++	{ .ca_id = 0x15, .n_ch = 8,
++	  .mask = FL | FR | LFE | FLC | FRC },
++	{ .ca_id = 0x14, .n_ch = 8,
++	  .mask = FL | FR | FLC | FRC },
+ };
+ 
+ struct hdmi_codec_priv {
+ 	struct hdmi_codec_pdata hcd;
+ 	uint8_t eld[MAX_ELD_BYTES];
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+

@@ -1,0 +1,118 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: John Doe <john.doe@somewhere.on.planet>
+Date: Wed, 27 Nov 2024 21:36:08 +0000
+Subject: Patching kernel rockchip64 files
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi
+ arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+ drivers/media/platform/rockchip/Kconfig
+ drivers/media/platform/rockchip/Makefile
+
+Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi      | 22 ++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-base.dtsi | 12 ++++-
+ drivers/media/platform/rockchip/Kconfig       |  1 +
+ drivers/media/platform/rockchip/Makefile      |  1 +
+ 4 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 45ade667d..9b4f46078 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -906,10 +906,32 @@ iep_mmu: iommu@ff3a0800 {
+ 		clock-names = "aclk", "iface";
+ 		power-domains = <&power RK3328_PD_VIDEO>;
+ 		#iommu-cells = <0>;
+ 	};
+ 
++	iep: iep@ff3a0000 {
++		compatible = "rockchip,rk3328-iep", "rockchip,rk3228-iep";
++		reg = <0x0 0xff3a0000 0x0 0x800>;
++		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "iep";
++		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
++		clock-names = "axi", "ahb";
++		power-domains = <&power RK3328_PD_VIDEO>;
++		iommus = <&iep_mmu>;
++	};
++
++	iep_mmu: iommu@ff3a0800 {
++		compatible = "rockchip,iommu";
++		reg = <0x0 0xff3a0800 0x0 0x40>;
++		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "iep_mmu";
++		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
++		clock-names = "aclk", "iface";
++		power-domains = <&power RK3328_PD_VIDEO>;
++		#iommu-cells = <0>;
++	};
++
+ 	hdmi: hdmi@ff3c0000 {
+ 		compatible = "rockchip,rk3328-dw-hdmi";
+ 		reg = <0x0 0xff3c0000 0x0 0x20000>;
+ 		reg-io-width = <4>;
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+index 6af5d7d9f..560efaec9 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-base.dtsi
+@@ -1481,10 +1481,21 @@ vdec_mmu: iommu@ff660480 {
+ 		power-domains = <&power RK3399_PD_VDU>;
+ 		#iommu-cells = <0>;
+ 	};
+ 
+ 
++	iep: iep@ff670000 {
++		compatible = "rockchip,rk3399-iep", "rockchip,rk3228-iep";
++		reg = <0x0 0xff670000 0x0 0x800>;
++		interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH 0>;
++		interrupt-names = "iep";
++		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
++		clock-names = "axi", "ahb";
++		power-domains = <&power RK3399_PD_IEP>;
++		iommus = <&iep_mmu>;
++	};
++
+ 	iep: iep@ff670000 {
+ 		compatible = "rockchip,rk3399-iep", "rockchip,rk3228-iep";
+ 		reg = <0x0 0xff670000 0x0 0x800>;
+ 		interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH 0>;
+ 		interrupt-names = "iep";
+@@ -1500,11 +1511,10 @@ iep_mmu: iommu@ff670800 {
+ 		interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH 0>;
+ 		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
+ 		clock-names = "aclk", "iface";
+ 		power-domains = <&power RK3399_PD_IEP>;
+ 		#iommu-cells = <0>;
+-		status = "disabled";
+ 	};
+ 
+ 	rga: rga@ff680000 {
+ 		compatible = "rockchip,rk3399-rga";
+ 		reg = <0x0 0xff680000 0x0 0x10000>;
+diff --git a/drivers/media/platform/rockchip/Kconfig b/drivers/media/platform/rockchip/Kconfig
+index 862590be7..c6d2620d7 100644
+--- a/drivers/media/platform/rockchip/Kconfig
++++ b/drivers/media/platform/rockchip/Kconfig
+@@ -1,7 +1,8 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ comment "Rockchip media platform drivers"
+ 
++source "drivers/media/platform/rockchip/iep/Kconfig"
+ source "drivers/media/platform/rockchip/rga/Kconfig"
+ source "drivers/media/platform/rockchip/rkisp1/Kconfig"
+ source "drivers/media/platform/rockchip/iep/Kconfig"
+diff --git a/drivers/media/platform/rockchip/Makefile b/drivers/media/platform/rockchip/Makefile
+index be8015c6d..15335f494 100644
+--- a/drivers/media/platform/rockchip/Makefile
++++ b/drivers/media/platform/rockchip/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0-only
++obj-y += iep/
+ obj-y += rga/
+ obj-y += rkisp1/
+ obj-y += iep/
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+
