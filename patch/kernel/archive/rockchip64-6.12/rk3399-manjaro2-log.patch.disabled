@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: John Doe <john.doe@somewhere.on.planet>
+Date: Sun, 8 Dec 2024 22:25:03 +0000
+Subject: Patching kernel rockchip64 files
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+
+Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 29c14397e..5bb13a61b 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -344,10 +344,12 @@ dw_hdmi_rockchip_mode_valid(struct dw_hdmi *dw_hdmi, void *data,
+ 
+ 		if (mpll_cfg[i].mpixelclock == (~0UL))
+ 			return MODE_CLOCK_HIGH;
+ 	}
+ 
++	printk(KERN_NOTICE "HDMI VALID4: clock %d, index %d, mpixelclock %lu\n", clock, i, mpll_cfg[i].mpixelclock);
++
+ 	return MODE_OK;
+ }
+ static void
+ dw_hdmi_rockchip_bridge_mode_set(struct drm_bridge *bridge,
+ 				 const struct drm_display_mode *mode,
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+
