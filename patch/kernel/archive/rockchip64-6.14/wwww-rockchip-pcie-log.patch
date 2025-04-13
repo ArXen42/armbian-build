@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: John Doe <john.doe@somewhere.on.planet>
+Date: Fri, 11 Apr 2025 11:38:58 +0000
+Subject: Patching kernel rockchip64 files
+ drivers/pci/controller/pcie-rockchip-host.c
+
+Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+---
+ drivers/pci/controller/pcie-rockchip-host.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/pci/controller/pcie-rockchip-host.c b/drivers/pci/controller/pcie-rockchip-host.c
+index dab41b969..285413818 100644
+--- a/drivers/pci/controller/pcie-rockchip-host.c
++++ b/drivers/pci/controller/pcie-rockchip-host.c
+@@ -297,10 +297,11 @@ static int rockchip_pcie_host_init_port(struct rockchip_pcie *rockchip)
+ 	struct device *dev = rockchip->dev;
+ 	int err, i = MAX_LANE_NUM;
+ 	u32 status;
+ 
+ 	gpiod_set_value_cansleep(rockchip->perst_gpio, 0);
++	dev_info(dev, "Setting PERST (GPIO %d) to 0", desc_to_gpio(rockchip->perst_gpio));
+ 
+ 	err = rockchip_pcie_init_port(rockchip);
+ 	if (err)
+ 		return err;
+ 
+@@ -326,10 +327,11 @@ static int rockchip_pcie_host_init_port(struct rockchip_pcie *rockchip)
+ 	rockchip_pcie_write(rockchip, PCIE_CLIENT_LINK_TRAIN_ENABLE,
+ 			    PCIE_CLIENT_CONFIG);
+ 
+ 	msleep(PCIE_T_PVPERL_MS);
+ 	gpiod_set_value_cansleep(rockchip->perst_gpio, 1);
++	dev_info(dev, "Setting PERST (GPIO %d) to 1", desc_to_gpio(rockchip->perst_gpio));
+ 
+ 	msleep(PCIE_T_RRS_READY_MS);
+ 
+ 	/* 500ms timeout value should be enough for Gen1/2 training */
+ 	err = readl_poll_timeout(rockchip->apb_base + PCIE_CLIENT_BASIC_STATUS1,
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+
