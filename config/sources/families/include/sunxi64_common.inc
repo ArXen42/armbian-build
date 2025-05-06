@@ -9,7 +9,7 @@
 enable_extension "sunxi-tools"
 declare -g ARCH=arm64
 declare -g ATF_TARGET_MAP="PLAT=$ATF_PLAT DEBUG=1 bl31;;build/$ATF_PLAT/debug/bl31.bin"
-declare -g ATFBRANCH="tag:v2.9.0"
+declare -g ATFBRANCH="tag:lts-v2.12.1"
 declare -g BOOTDELAY=1
 declare -g BOOTPATCHDIR="${BOOTPATCHDIR:-"u-boot-sunxi"}"
 declare -g BOOTBRANCH="${BOOTBRANCH:-"tag:v2024.01"}"
@@ -31,12 +31,12 @@ case $BRANCH in
 
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.12" # Major and minor versions of this kernel.
-		declare -g KERNELBRANCH="tag:v6.12.20"
+		declare -g KERNELBRANCH="tag:v6.12.23"
 		;;
 
 	edge)
 		declare -g KERNEL_MAJOR_MINOR="6.13" # Major and minor versions of this kernel.
-		declare -g KERNELBRANCH="tag:v6.13.7"
+		declare -g KERNELBRANCH="tag:v6.13.11"
 		;;
 esac
 
