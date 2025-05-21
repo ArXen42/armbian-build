@@ -1,0 +1,86 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: John Doe <john.doe@somewhere.on.planet>
+Date: Mon, 19 May 2025 14:59:12 +0000
+Subject: Patching kernel rockchip64 files
+ drivers/pci/controller/pcie-rockchip-host.c
+ drivers/pci/controller/pcie-rockchip.c drivers/pci/controller/pcie-rockchip.h
+
+Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+---
+ drivers/pci/controller/pcie-rockchip-host.c | 6 ++++--
+ drivers/pci/controller/pcie-rockchip.c      | 6 ++++++
+ drivers/pci/controller/pcie-rockchip.h      | 1 +
+ 3 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/controller/pcie-rockchip-host.c b/drivers/pci/controller/pcie-rockchip-host.c
+index 252fdbd0ecaf..5f3fb49b082c 100644
+--- a/drivers/pci/controller/pcie-rockchip-host.c
++++ b/drivers/pci/controller/pcie-rockchip-host.c
+@@ -297,11 +297,12 @@ static int rockchip_pcie_host_init_port(struct rockchip_pcie *rockchip)
+ 	struct device *dev = rockchip->dev;
+ 	int err, i = MAX_LANE_NUM;
+ 	u32 status;
+ 
+ 	gpiod_set_value_cansleep(rockchip->ep_gpio, 0);
+-	dev_info(dev, "Setting PERST (GPIO %d) to 0", desc_to_gpio(rockchip->ep_gpio));
++	gpiod_set_value_cansleep(rockchip->perst_custom_gpio, 0);
++	dev_info(dev, "Set EP (GPIO %d) and PERST (GPIO %d) to 0", desc_to_gpio(rockchip->ep_gpio), desc_to_gpio(rockchip->perst_custom_gpio));
+ 
+ 	err = rockchip_pcie_init_port(rockchip);
+ 	if (err)
+ 		return err;
+ 
+@@ -327,11 +328,12 @@ static int rockchip_pcie_host_init_port(struct rockchip_pcie *rockchip)
+ 	rockchip_pcie_write(rockchip, PCIE_CLIENT_LINK_TRAIN_ENABLE,
+ 			    PCIE_CLIENT_CONFIG);
+ 
+ 	msleep(PCIE_T_PVPERL_MS);
+ 	gpiod_set_value_cansleep(rockchip->ep_gpio, 1);
+-	dev_info(dev, "Setting PERST (GPIO %d) to 1", desc_to_gpio(rockchip->ep_gpio));
++	gpiod_set_value_cansleep(rockchip->perst_custom_gpio, 1);
++	dev_info(dev, "Set EP (GPIO %d) and PERST (GPIO %d) to 1", desc_to_gpio(rockchip->ep_gpio), desc_to_gpio(rockchip->perst_custom_gpio));
+ 
+ 	msleep(PCIE_T_RRS_READY_MS);
+ 
+ 	/* 500ms timeout value should be enough for Gen1/2 training */
+ 	err = readl_poll_timeout(rockchip->apb_base + PCIE_CLIENT_BASIC_STATUS1,
+diff --git a/drivers/pci/controller/pcie-rockchip.c b/drivers/pci/controller/pcie-rockchip.c
+index 49afc6398bca..09382a704631 100644
+--- a/drivers/pci/controller/pcie-rockchip.c
++++ b/drivers/pci/controller/pcie-rockchip.c
+@@ -123,10 +123,16 @@ int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+ 		rockchip->ep_gpio = devm_gpiod_get_optional(dev, "ep",
+ 							    GPIOD_OUT_LOW);
+ 		if (IS_ERR(rockchip->ep_gpio))
+ 			return dev_err_probe(dev, PTR_ERR(rockchip->ep_gpio),
+ 					     "failed to get ep GPIO\n");
++
++		rockchip->perst_custom_gpio = devm_gpiod_get_optional(dev, "perst-custom",
++							    GPIOD_OUT_LOW);
++		if (IS_ERR(rockchip->perst_custom_gpio))
++			return dev_err_probe(dev, PTR_ERR(rockchip->perst_custom_gpio),
++					     "failed to get PERST GPIO\n");
+ 	}
+ 
+ 	rockchip->aclk_pcie = devm_clk_get(dev, "aclk");
+ 	if (IS_ERR(rockchip->aclk_pcie)) {
+ 		dev_err(dev, "aclk clock not found\n");
+diff --git a/drivers/pci/controller/pcie-rockchip.h b/drivers/pci/controller/pcie-rockchip.h
+index 8dab3d835c7b..b5005d453411 100644
+--- a/drivers/pci/controller/pcie-rockchip.h
++++ b/drivers/pci/controller/pcie-rockchip.h
+@@ -309,10 +309,11 @@ struct rockchip_pcie {
+ 	struct	regulator *vpcie12v; /* 12V power supply */
+ 	struct	regulator *vpcie3v3; /* 3.3V power supply */
+ 	struct	regulator *vpcie1v8; /* 1.8V power supply */
+ 	struct	regulator *vpcie0v9; /* 0.9V power supply */
+ 	struct	gpio_desc *ep_gpio;
++	struct	gpio_desc *perst_custom_gpio;
+ 	u32	lanes;
+ 	u8      lanes_map;
+ 	int	link_gen;
+ 	struct	device *dev;
+ 	struct	irq_domain *irq_domain;
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+
