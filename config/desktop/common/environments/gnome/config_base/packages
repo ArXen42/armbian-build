@@ -56,3 +56,14 @@ xfonts-base
 xserver-xorg
 xwayland
 zenity
+chromium
+fonts-noto-ui-core
+fonts-noto-core
+gnome-shell-extension-desktop-icons-ng
+gnome-shell-extension-manager
+fonts-noto-core
+fonts-noto-ui-core
+meson
+libwlroots-dev
+libxkbcommon-dev
+

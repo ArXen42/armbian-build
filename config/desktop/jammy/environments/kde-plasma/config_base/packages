@@ -4,8 +4,6 @@ blueman
 bluez
 bluez-cups
 bluez-tools
-brltty
-brltty-x11
 cifs-utils
 colord
 cups
@@ -150,3 +148,15 @@ xserver-xorg
 xserver-xorg-video-fbdev
 xauth
 xwallpaper
+plasma-workspace-wallpapers
+maliit-keyboard
+kdeadmin
+kdeutils
+kscreen
+qtwayland5
+kde-config-screenlocker
+kde-config-sddm
+sddm-theme-breeze
+chromium
+onboard
+juk
